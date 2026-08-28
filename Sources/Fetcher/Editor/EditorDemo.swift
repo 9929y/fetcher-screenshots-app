@@ -101,8 +101,24 @@ enum EditorDemo {
             }
             settings.close()
 
+            // A capture too small to work in at 1:1, magnified. At 1:1 the
+            // window came out narrower than its own toolbar.
+            if let tiny = SyntheticScreen.make(size: CGSize(width: 300, height: 180),
+                                               scale: 2, dark: false) {
+                let small = EditorWindowController(
+                    image: tiny, scale: 2,
+                    regionOnScreen: CGRect(x: 300, y: 300, width: 300, height: 180))
+                small.show()
+                let c = small.canvasForTesting
+                let box = c.document.add(rect: CGRect(x: 40, y: 30, width: 200, height: 90))
+                c.document.setNote("This label is too tight against the edge.", for: box.id)
+                small.refreshToolbar()
+                await settle(0.7)
+                snapshot(small, to: dir.appendingPathComponent("editor-small.png"))
+            }
+
             print("[fetcher] wrote editor-selected.png, editor-editing.png, "
-                  + "shelf.png, settings.png")
+                  + "shelf.png, settings.png, editor-small.png")
             NSApp.terminate(nil)
         }
     }

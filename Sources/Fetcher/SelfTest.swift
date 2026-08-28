@@ -23,6 +23,8 @@ enum SelfTest {
             paletteChecks()
             print("\n  compositor")
             compositorChecks()
+            print("\n  editor sizing")
+            zoomChecks()
             print("\n  settings")
             settingsChecks()
             print("\n  drag payload")
@@ -318,6 +320,42 @@ enum SelfTest {
         doc.setNote("Middle card — this is the recommended plan. Add the accent border and a \"Popular\" pill.", for: b.id)
         let c = doc.add(rect: CGRect(x: 48 * s, y: 452 * s, width: 170 * s, height: 40 * s))
         doc.setNote("Button — full width on mobile, and the label should read \"Start free trial\".", for: c.id)
+    }
+
+    // MARK: Editor sizing
+
+    private static func zoomChecks() {
+        let minimum = CGSize(width: 660, height: 380)
+        let roomy = CGSize(width: 1700, height: 1000)
+
+        func zoom(_ w: Int, _ h: Int, scale: CGFloat = 2,
+                  available: CGSize = roomy) -> CGFloat {
+            guard let img = SyntheticScreen.make(
+                size: CGSize(width: CGFloat(w), height: CGFloat(h)),
+                scale: scale, dark: false) else { return -1 }
+            return CanvasView.fittingZoom(forImage: img, scale: scale,
+                                          minimum: minimum, available: available)
+        }
+
+        // A capture larger than the minimum is shown as it is. Magnifying a
+        // large screenshot would only make it harder to see all of.
+        check("a large capture is not magnified", zoom(900, 560) == 1,
+              "\(zoom(900, 560))×")
+
+        // A small one is magnified until the toolbar fits and a box can be
+        // drawn precisely — at 1:1 the window came out smaller than its own
+        // toolbar, which is unusable rather than merely cramped.
+        let small = zoom(300, 180)
+        check("a small capture is magnified", small > 2, "\(String(format: "%.2f", small))×")
+        check("magnified enough for the toolbar to fit",
+              300 * small >= minimum.width - 1,
+              "\(Int(300 * small))pt wide, needs \(Int(minimum.width))")
+
+        check("magnification is capped", zoom(40, 30) <= 3,
+              "\(String(format: "%.2f", zoom(40, 30)))×")
+        check("never magnified past the screen",
+              zoom(300, 180, available: CGSize(width: 500, height: 400)) < small,
+              "\(String(format: "%.2f", zoom(300, 180, available: CGSize(width: 500, height: 400))))×")
     }
 
     // MARK: Settings

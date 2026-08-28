@@ -30,6 +30,7 @@ enum E2ETest {
             await multipleDisplays()
             await plainCapture()
             await visibleNotes()
+            await smallCapture()
 
             print("\n[fetcher] \(checks) checks, \(failures) failed")
             NSApp.terminate(nil)
@@ -289,6 +290,71 @@ enum E2ETest {
               text.replacingOccurrences(of: "\n", with: " | "))
         check("the scope-limiting closer survives",
               text.contains("Change only what's listed"))
+    }
+
+    // MARK: Scenario 9 — a capture too small to work in at 1:1
+
+    /// The zoom is display-only, so the thing to prove is that it changes
+    /// nothing about where an annotation lands. A scaling mistake here would
+    /// misplace every box in the export, silently and proportionally.
+    private static func smallCapture() async {
+        print("\n  a small capture")
+        let previous = Settings.shared.autoFinishSeconds
+        Settings.shared.autoFinishSeconds = 0
+        defer { Settings.shared.autoFinishSeconds = previous }
+
+        guard let base = SyntheticScreen.make(size: CGSize(width: 300, height: 180),
+                                              scale: 2, dark: false) else {
+            check("small fixture", false); return
+        }
+        let controller = EditorWindowController(
+            image: base, scale: 2,
+            regionOnScreen: CGRect(x: 400, y: 400, width: 300, height: 180))
+        controller.show()
+        let canvas = controller.canvasForTesting
+        await settle(0.4)
+
+        let zoom = canvas.bounds.width / (CGFloat(base.width) / 2)
+        check("the editor is magnified", zoom > 2, "\(String(format: "%.2f", zoom))×")
+        check("and is wide enough for its own toolbar", canvas.bounds.width >= 659,
+              "\(Int(canvas.bounds.width))pt")
+
+        // Drag a known rectangle and check where it landed, in image pixels.
+        let from = CGPoint(x: 100, y: 80), to = CGPoint(x: 400, y: 260)
+        await drag(from: from, to: to, in: canvas)
+        guard let a = canvas.document.annotations.first else {
+            check("the drag made a box", false); return
+        }
+        let expectedW = (to.x - from.x) * 2 / zoom
+        let expectedH = (to.y - from.y) * 2 / zoom
+        check("the box lands where it was drawn, in image pixels",
+              abs(a.rect.width - expectedW) < 2 && abs(a.rect.height - expectedH) < 2,
+              "\(Int(a.rect.width))x\(Int(a.rect.height))px, expected "
+              + "\(Int(expectedW))x\(Int(expectedH))")
+        check("and inside the capture",
+              a.rect.maxX <= CGFloat(base.width) + 1 && a.rect.maxY <= CGFloat(base.height) + 1,
+              "ends at \(Int(a.rect.maxX)),\(Int(a.rect.maxY)) of \(base.width)x\(base.height)")
+
+        type("Smaller.", in: canvas)
+        press(K.ret, "\r", in: canvas)
+        await settle(0.2)
+
+        // A click that goes nowhere reopens the note; a click that drags moves
+        // the box. Both go through the same mouse-down.
+        let centre = CGPoint(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)
+        if let e = mouse(.leftMouseDown, at: centre, in: canvas) { canvas.mouseDown(with: e) }
+        if let e = mouse(.leftMouseUp, at: centre, in: canvas) { canvas.mouseUp(with: e) }
+        await settle(0.3)
+        check("a click with no drag reopens the note",
+              canvas.window?.firstResponder is NoteTextView)
+        press(K.ret, "\r", in: canvas)
+        await settle(0.2)
+
+        let before = canvas.document.annotations[0].rect
+        await drag(from: centre, to: CGPoint(x: centre.x + 40, y: centre.y), in: canvas)
+        check("a click that drags still moves the box",
+              canvas.document.annotations[0].rect.minX > before.minX,
+              "moved \(Int(canvas.document.annotations[0].rect.minX - before.minX))px")
     }
 
     // MARK: Scenario 8 — more than one screen

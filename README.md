@@ -71,8 +71,14 @@ While the crosshair is up, hovering a card or a Figma frame outlines it — clic
 or press `⏎` to take it, or drag as usual to ignore it. Hold `⌥` to turn
 snapping off.
 
-Committed notes stay visible on the canvas under their boxes; click one to edit
-it. The toolbar carries visible Undo and Discard buttons beside Copy — a
+A capture smaller than the editor's working minimum is magnified — at 1:1 a
+small region produced a window narrower than its own toolbar. The zoom is
+display only: annotation rects stay in image pixels, so the export is identical
+either way.
+
+Committed notes stay visible on the canvas under their boxes, two lines at most
+with the overflow truncated. Click a note — or click its box without dragging —
+to reopen it; dragging still moves the box. The toolbar carries visible Undo and Discard buttons beside Copy — a
 keyboard-first tool still has to show its keys. They are on the canvas because
 that is a working surface — in the *export* they move to the legend, because a
 sentence pasted over a design covers the thing being judged.
@@ -133,8 +139,8 @@ twice; the numbers carry it.
 
 ```bash
 swift build
-./.build/debug/Fetcher --selftest      # 83 unit checks
-./.build/debug/Fetcher --e2e           # 48 end-to-end checks
+./.build/debug/Fetcher --selftest      # 88 unit checks
+./.build/debug/Fetcher --e2e           # 54 end-to-end checks
 ./.build/debug/Fetcher --editor-demo   # writes UI state PNGs to dist/
 ```
 

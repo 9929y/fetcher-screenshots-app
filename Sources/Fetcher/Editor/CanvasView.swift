@@ -45,6 +45,13 @@ final class CanvasView: NSView {
     let document = MarkupDocument()
     private let image: CGImage
     private let imageScale: CGFloat
+    /// View points per image point.
+    ///
+    /// A small capture shown at 1:1 gives a window too small to annotate in and
+    /// far too small for the toolbar, so small captures are magnified. This is
+    /// display only — annotation rects stay in image pixels, so the export is
+    /// unaffected and nothing downstream has to know.
+    private let zoom: CGFloat
     private let overDark: Bool
 
     var onFinish: (() -> Void)?
@@ -65,20 +72,37 @@ final class CanvasView: NSView {
     private var noteField: NoteFieldView?
     private var noteBackup: String = ""
     private var dragOrigin: CGRect = .zero
+    private var didDrag = false
     private var grabOffset: CGSize = .zero
 
     private var now: CFTimeInterval { CACurrentMediaTime() }
 
     // MARK: Init
 
-    init(image: CGImage, scale: CGFloat) {
+    init(image: CGImage, scale: CGFloat, zoom: CGFloat = 1) {
         self.image = image
         self.imageScale = scale
+        self.zoom = zoom
         self.overDark = Compositor.isDark(image)
         super.init(frame: NSRect(x: 0, y: 0,
-                                 width: CGFloat(image.width) / scale,
-                                 height: CGFloat(image.height) / scale))
+                                 width: CGFloat(image.width) / scale * zoom,
+                                 height: CGFloat(image.height) / scale * zoom))
         wantsLayer = true
+    }
+
+    /// The zoom that makes a capture workable: big enough for the toolbar to
+    /// fit and for a box to be drawn precisely, never shrinking a large
+    /// capture, and never magnifying past the point of usefulness.
+    static func fittingZoom(forImage image: CGImage, scale: CGFloat,
+                            minimum: CGSize, available: CGSize) -> CGFloat {
+        let points = CGSize(width: CGFloat(image.width) / scale,
+                            height: CGFloat(image.height) / scale)
+        guard points.width > 0, points.height > 0 else { return 1 }
+
+        let wanted = max(minimum.width / points.width, minimum.height / points.height)
+        let ceilingFromScreen = min(available.width / points.width,
+                                    available.height / points.height)
+        return min(max(1, wanted), max(1, min(3, ceilingFromScreen)))
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -93,10 +117,24 @@ final class CanvasView: NSView {
 
     // MARK: Coordinates
 
-    private func px(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x * imageScale, y: p.y * imageScale) }
+    private func px(_ p: CGPoint) -> CGPoint {
+        CGPoint(x: p.x * imageScale / zoom, y: p.y * imageScale / zoom)
+    }
+
+    /// View points to image pixels, for a rect.
+    ///
+    /// This exists because the one place that open-coded the conversion — the
+    /// mouse-up that turns a drag into a box — was missed when zoom was added,
+    /// and produced boxes scaled by the zoom factor. There is now a single way
+    /// to cross between the two spaces in each direction.
+    private func px(_ r: CGRect) -> CGRect {
+        let k = imageScale / zoom
+        return CGRect(x: r.minX * k, y: r.minY * k, width: r.width * k, height: r.height * k)
+    }
+
     private func pt(_ r: CGRect) -> CGRect {
-        CGRect(x: r.minX / imageScale, y: r.minY / imageScale,
-               width: r.width / imageScale, height: r.height / imageScale)
+        let k = zoom / imageScale
+        return CGRect(x: r.minX * k, y: r.minY * k, width: r.width * k, height: r.height * k)
     }
 
     // MARK: Drawing
@@ -109,7 +147,7 @@ final class CanvasView: NSView {
 
         // Annotations, drawn by the exporter's own code at 1/scale.
         ctx.saveGState()
-        ctx.scaleBy(x: 1 / imageScale, y: 1 / imageScale)
+        ctx.scaleBy(x: zoom / imageScale, y: zoom / imageScale)
         for (i, a) in document.annotations.enumerated() {
             let m = motions[a.id] ?? AnnotationMotion()
             let alive = m.alive.value(at: t)
@@ -312,8 +350,8 @@ final class CanvasView: NSView {
         path.fill()
 
         drawSizeChip(for: r, text: sizeText(CGRect(x: 0, y: 0,
-                                                   width: r.width * imageScale,
-                                                   height: r.height * imageScale)))
+                                                   width: r.width * imageScale / zoom,
+                                                   height: r.height * imageScale / zoom)))
     }
 
     private func sizeText(_ pxRect: CGRect) -> String {
@@ -430,8 +468,8 @@ final class CanvasView: NSView {
         case .left:        out = CGRect(x: p.x, y: r.minY, width: r.maxX - p.x, height: r.height)
         }
         return CGRect(x: out.minX, y: out.minY,
-                      width: max(8 * imageScale, out.width),
-                      height: max(8 * imageScale, out.height))
+                      width: max(8 * imageScale / zoom, out.width),
+                      height: max(8 * imageScale / zoom, out.height))
     }
 
     // MARK: Animation
@@ -550,6 +588,7 @@ final class CanvasView: NSView {
 
         if let hit = document.hits(at: px(p)).first {
             if event.clickCount >= 2 { beginEditing(hit.id); return }
+            didDrag = false
             dragOrigin = hit.rect
             grabOffset = CGSize(width: px(p).x - hit.rect.minX, height: px(p).y - hit.rect.minY)
             mode = .moving(hit.id)
@@ -565,6 +604,7 @@ final class CanvasView: NSView {
         case .drawing(let anchor, _):
             mode = .drawing(anchor: anchor, to: p)
         case .moving(let id):
+            didDrag = true
             let target = CGRect(x: px(p).x - grabOffset.width, y: px(p).y - grabOffset.height,
                                 width: dragOrigin.width, height: dragOrigin.height)
             document.setRect(clamped(target), for: id, checkpointing: false)
@@ -586,13 +626,16 @@ final class CanvasView: NSView {
             // A click is not a box. Below the threshold, deselect instead —
             // throwing the markup away over a stray click would be hostile.
             guard r.width >= 6, r.height >= 6 else { mode = .idle; return }
-            let a = document.add(rect: clamped(CGRect(x: r.minX * imageScale,
-                                                      y: r.minY * imageScale,
-                                                      width: r.width * imageScale,
-                                                      height: r.height * imageScale)))
+            let a = document.add(rect: clamped(px(r)))
             motions[a.id] = AnnotationMotion()
             beginEditing(a.id)
-        case .moving(let id), .resizing(let id, _):
+        case .moving(let id):
+            // A click that went nowhere means "let me change what I wrote",
+            // not "select this". Dragging still moves the box; the two are
+            // told apart by whether the pointer actually travelled.
+            if didDrag { mode = .selected(id) } else { beginEditing(id) }
+            didDrag = false
+        case .resizing(let id, _):
             mode = .selected(id)
         default:
             break
@@ -829,7 +872,7 @@ final class CanvasView: NSView {
 
     private func nudge(keyCode: UInt16, mods: NSEvent.ModifierFlags) {
         guard case .selected(let id) = mode, let a = document.annotation(id) else { return }
-        let step: CGFloat = (mods.contains(.shift) ? 10 : 1) * imageScale
+        let step: CGFloat = (mods.contains(.shift) ? 10 : 1) * imageScale / zoom
         let dx: CGFloat = keyCode == 123 ? -step : (keyCode == 124 ? step : 0)
         let dy: CGFloat = keyCode == 126 ? -step : (keyCode == 125 ? step : 0)
 
@@ -837,8 +880,8 @@ final class CanvasView: NSView {
         // a box precisely without a mouse.
         let r = mods.contains(.option)
             ? CGRect(x: a.rect.minX, y: a.rect.minY,
-                     width: max(8 * imageScale, a.rect.width + dx),
-                     height: max(8 * imageScale, a.rect.height + dy))
+                     width: max(8 * imageScale / zoom, a.rect.width + dx),
+                     height: max(8 * imageScale / zoom, a.rect.height + dy))
             : a.rect.offsetBy(dx: dx, dy: dy)
 
         document.setRect(clamped(r), for: id, checkpointing: true)

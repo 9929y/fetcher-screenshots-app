@@ -28,8 +28,23 @@ final class EditorWindowController: NSObject {
     /// The presentation owns itself, and hands that back at dismiss.
     private var whilePresented: EditorWindowController?
 
+    /// The smallest editor worth opening.
+    ///
+    /// The width is set by the toolbar, which carries ten swatches, a live key
+    /// hint and three controls; below this it overlaps itself. The height is
+    /// what it takes to draw a box and read the note under it. A capture
+    /// smaller than this is magnified rather than shown in a window nobody can
+    /// work in.
+    private static let minimumCanvas = CGSize(width: 660, height: 380)
+
     init(image: CGImage, scale: CGFloat, regionOnScreen: CGRect) {
-        self.canvas = CanvasView(image: image, scale: scale)
+        let available = (NSScreen.main?.visibleFrame.size).map {
+            CGSize(width: $0.width - 80, height: $0.height - 80 - 46)
+        } ?? CGSize(width: 1200, height: 800)
+        let zoom = CanvasView.fittingZoom(forImage: image, scale: scale,
+                                          minimum: EditorWindowController.minimumCanvas,
+                                          available: available)
+        self.canvas = CanvasView(image: image, scale: scale, zoom: zoom)
         self.toolbar = EditorToolbar()
         self.regionOnScreen = regionOnScreen
         super.init()
@@ -39,8 +54,11 @@ final class EditorWindowController: NSObject {
 
     func show() {
         let canvasSize = canvas.frame.size
-        var frame = CGRect(x: regionOnScreen.minX,
-                           y: regionOnScreen.minY - toolbarHeight,
+        // Magnified captures cannot sit exactly over the region they came from,
+        // so they are centred on it — the content still appears where the eye
+        // already is, which is the property that mattered.
+        var frame = CGRect(x: regionOnScreen.midX - canvasSize.width / 2,
+                           y: regionOnScreen.midY - (canvasSize.height + toolbarHeight) / 2,
                            width: canvasSize.width,
                            height: canvasSize.height + toolbarHeight)
 

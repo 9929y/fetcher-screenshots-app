@@ -1,0 +1,13 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Build output: the assembled .app, the signed bundle, and the PNGs the
+# self-test and the state snapshots write. All reproducible, none of it
+# belongs in history — and the snapshots would carry local paths.
+dist/
+
+.DS_Store
+xcuserdata/
+*.xcuserstate

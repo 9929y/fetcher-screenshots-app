@@ -83,10 +83,10 @@ final class EditorWindowController: NSObject {
 
         let container = FlippedView(frame: CGRect(origin: .zero, size: frame.size))
         container.wantsLayer = true
-        container.layer?.cornerRadius = 12
+        container.layer?.cornerRadius = YYStudioTokens.panelRadius
         container.layer?.cornerCurve = .continuous
         container.layer?.masksToBounds = true
-        container.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        container.layer?.backgroundColor = NSColor(YYStudioTokens.ground).cgColor
 
         canvas.frame = CGRect(origin: .zero, size: canvasSize)
         toolbar.frame = CGRect(x: 0, y: canvasSize.height,

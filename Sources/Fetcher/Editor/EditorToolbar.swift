@@ -50,12 +50,12 @@ final class EditorToolbar: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override func updateLayer() {
-        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        layer?.backgroundColor = NSColor(YYStudioTokens.ground).cgColor
     }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        NSColor.separatorColor.setFill()
+        NSColor(YYStudioTokens.hairline).setFill()
         CGRect(x: 0, y: 0, width: bounds.width, height: 1).fill()
     }
 

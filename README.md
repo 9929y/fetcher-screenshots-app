@@ -8,6 +8,13 @@ the marked-up image *and* a numbered instruction list the model can read.
 Targets Cursor, Claude Code and Codex, which is why every capture is written to
 disk as well as copied: the terminal-first tools want a path, not a paste.
 
+## Interface system
+
+Fetcher uses the local **Pearl Flowglass** token set shared with the Yanice Yang
+studio tools: quiet pearl surfaces, a single dark ink, large working radii, and
+one fast, reversible motion curve. The capture workflow stays native to macOS;
+the shared system only aligns material, spacing, and feedback.
+
 ## Build
 
 Requires the Command Line Tools only — no Xcode.

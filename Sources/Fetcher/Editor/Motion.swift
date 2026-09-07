@@ -16,13 +16,13 @@ enum Motion {
 
     enum Duration {
         /// State flips the user did on purpose: hover, selection, color change.
-        static let quick: CFTimeInterval = 0.14
+        static let quick: CFTimeInterval = YYStudioTokens.quick
         /// Things appearing or leaving: handles, the note field, dimming.
-        static let standard: CFTimeInterval = 0.20
+        static let standard: CFTimeInterval = YYStudioTokens.fast
         /// Window entrance and exit.
-        static let entrance: CFTimeInterval = 0.24
+        static let entrance: CFTimeInterval = YYStudioTokens.medium
         /// The commit confirmation.
-        static let pulse: CFTimeInterval = 0.30
+        static let pulse: CFTimeInterval = YYStudioTokens.slow
     }
 
     enum Curve {
@@ -42,7 +42,7 @@ enum Motion {
         }
     }
 
-    static let timing = CAMediaTimingFunction(controlPoints: 0.2, 0, 0, 1)
+    static let timing = CAMediaTimingFunction(controlPoints: 0.22, 1, 0.36, 1)
 
     /// Wraps an AppKit animation with the reduce-motion escape hatch.
     static func animate(_ duration: CFTimeInterval,

@@ -15,7 +15,7 @@ final class EditorToolbar: NSView {
 
     private let swatches = PaletteStrip()
     private let hint = NSTextField(labelWithString: "")
-    private let copyButton = SoftButton(title: "Copy", shortcut: "⌘C")
+    private let copyButton = SoftButton(title: "Copy image", shortcut: "⌘C")
     // Undo and cancel were reachable only by shortcut, which is the same as not
     // existing for anyone who has not read the docs.
     private let undoButton = IconButton(symbol: "arrow.uturn.backward",
@@ -62,7 +62,8 @@ final class EditorToolbar: NSView {
     override func layout() {
         super.layout()
         let pad: CGFloat = 12
-        let swatchWidth = swatches.intrinsicContentSize.width
+        let showsPalette = !swatches.isHidden
+        let swatchWidth = showsPalette ? swatches.intrinsicContentSize.width : 0
         swatches.frame = CGRect(x: pad, y: (bounds.height - 18) / 2,
                                 width: swatchWidth, height: 18)
 
@@ -79,7 +80,7 @@ final class EditorToolbar: NSView {
                                   y: (bounds.height - icon.height) / 2,
                                   width: icon.width, height: icon.height)
 
-        let hintX = swatches.frame.maxX + 14
+        let hintX = showsPalette ? swatches.frame.maxX + 14 : pad
         hint.frame = CGRect(x: hintX, y: (bounds.height - 16) / 2,
                             width: max(0, undoButton.frame.minX - hintX - 12), height: 16)
     }
@@ -105,20 +106,20 @@ final class EditorToolbar: NSView {
     private func hintText(for canvas: CanvasView) -> String {
         switch canvas.mode {
         case .editing:
-            return "⏎ commit  ·  ⇧⏎ newline  ·  ⇥ next note  ·  ⌥1–0 recolor  ·  esc cancel"
+            return "Write a note, then press Return to place it"
         case .drawing:
-            return "Release to write the note"
+            return "Release to add a note"
         case .selected:
-            return "1–0 recolor  ·  ⌫ delete  ·  arrows nudge  ·  ⌥arrows resize  ·  ⏎ edit note"
+            return "Choose a colour, move it, or press Return to edit"
         case .moving, .resizing:
             return "Release to place"
         case .finishing:
             return "Copying…"
         case .idle, .hovering:
             if canvas.document.isEmpty {
-                return "⌘C copy as-is  ·  or drag a box to mark it up"
+                return "Drag to mark up, then copy the image"
             }
-            return "⌘C copy image  ·  ⌥⌘C copy text only  ·  ⇥ select  ·  ⌘Z undo"
+            return "Select a note to adjust it, or copy the image"
         }
     }
 
@@ -156,6 +157,11 @@ final class PaletteStrip: NSView {
     func update(next: Int, selected: Int?) {
         self.next = next
         self.selected = selected
+        // Colour selection is contextual: showing ten dots before there is a
+        // selected annotation makes the capture workflow look more complex
+        // than it is. Selecting a note reveals this focused tool immediately.
+        isHidden = selected == nil
+        superview?.needsLayout = true
         needsDisplay = true
     }
 
@@ -241,12 +247,12 @@ final class SoftButton: NSView {
 
     private var titleAttrs: [NSAttributedString.Key: Any] {
         [.font: NSFont.systemFont(ofSize: 12, weight: .medium),
-         .foregroundColor: isEnabled ? NSColor.white : NSColor.tertiaryLabelColor]
+         .foregroundColor: isEnabled ? NSColor(YYStudioTokens.ink) : NSColor.tertiaryLabelColor]
     }
 
     private var shortcutAttrs: [NSAttributedString.Key: Any] {
         [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular),
-         .foregroundColor: (isEnabled ? NSColor.white : NSColor.tertiaryLabelColor)
+         .foregroundColor: (isEnabled ? NSColor(YYStudioTokens.muted) : NSColor.tertiaryLabelColor)
             .withAlphaComponent(isEnabled ? 0.65 : 1)]
     }
 
@@ -257,16 +263,18 @@ final class SoftButton: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let base = Theme.accent
         let fill: NSColor
-        if !isEnabled          { fill = NSColor.quaternaryLabelColor }
-        else if isPressed      { fill = base.blended(withFraction: 0.18, of: .black) ?? base }
-        else if isHovered      { fill = base.blended(withFraction: 0.12, of: .white) ?? base }
-        else                   { fill = base }
+        if !isEnabled          { fill = NSColor(YYStudioTokens.hairline).withAlphaComponent(0.56) }
+        else if isPressed      { fill = NSColor.white.withAlphaComponent(0.88) }
+        else if isHovered      { fill = NSColor.white.withAlphaComponent(0.78) }
+        else                   { fill = NSColor.white.withAlphaComponent(0.62) }
 
         fill.setFill()
-        let path = NSBezierPath(roundedRect: bounds, xRadius: 6, yRadius: 6)
+        let path = NSBezierPath(roundedRect: bounds, xRadius: 10, yRadius: 10)
         path.fill()
+        NSColor.white.withAlphaComponent(0.92).setStroke()
+        path.lineWidth = 1
+        path.stroke()
 
         let t = title as NSString
         let s = shortcut as NSString

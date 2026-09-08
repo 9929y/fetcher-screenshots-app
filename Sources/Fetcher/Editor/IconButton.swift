@@ -38,13 +38,17 @@ final class IconButton: NSView {
     private var tint: NSColor {
         if !isEnabled { return .tertiaryLabelColor }
         if prominent { return Theme.accent }
-        return isHovered ? .labelColor : .secondaryLabelColor
+        return isHovered ? NSColor(YYStudioTokens.ink) : NSColor(YYStudioTokens.muted)
     }
 
     override func draw(_ dirtyRect: NSRect) {
         if isEnabled, isHovered || isPressed {
-            NSColor.labelColor.withAlphaComponent(isPressed ? 0.14 : 0.07).setFill()
-            NSBezierPath(roundedRect: bounds, xRadius: 6, yRadius: 6).fill()
+            NSColor.white.withAlphaComponent(isPressed ? 0.88 : 0.64).setFill()
+            let hoverPath = NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8)
+            hoverPath.fill()
+            NSColor(YYStudioTokens.hairline).withAlphaComponent(0.7).setStroke()
+            hoverPath.lineWidth = 1
+            hoverPath.stroke()
         }
 
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)

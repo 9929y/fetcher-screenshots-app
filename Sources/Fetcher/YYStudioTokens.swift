@@ -2,11 +2,11 @@
 import SwiftUI
 
 enum YYStudioTokens {
-  static let ground = Color(hex: "#FFFFFF")
+  static let ground = Color(hex: "#F6F7F8")
   static let ink = Color(hex: "#242220")
   static let muted = Color(hex: "#55534E")
   static let quiet = Color(hex: "#6D6A63")
-  static let hairline = Color(hex: "#E4E1DC")
+  static let hairline = Color(hex: "#DCE1E6")
   static let controlRadius: CGFloat = 10
   static let panelRadius: CGFloat = 18
   static let modalRadius: CGFloat = 26

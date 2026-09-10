@@ -169,3 +169,7 @@ Sources/Fetcher/
 Version 0.1.0. Capture, annotation, export, settings and multi-display support
 are implemented. A selection spanning two displays is not supported. Distribution
 is source-only for now; there is no notarized build.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).
